@@ -352,8 +352,7 @@
         // Current year
         document.getElementById('currentYear').textContent = new Date().getFullYear();
 
-        /* --------- Pairing logic (connects to your /pair endpoint) ---------- */
-        const submitButton = document.getElementById('submit');
+         const submitButton = document.getElementById('submit');
         const phoneNumberInput = document.getElementById('phone-number');
         const resultDiv = document.getElementById('result');
         const pairCodeDiv = document.getElementById('pair-code');
@@ -363,107 +362,67 @@
         const btnText = document.getElementById('btn-text');
         const btnSpinner = document.getElementById('btn-spinner');
         const loadingSpinner = document.getElementById('loading-spinner');
-        const clearBtn = document.getElementById('clearBtn');
 
-        function validatePhoneNumber(number){
-            const cleaned = ('' + number).replace(/\D/g, '');
+        function validatePhoneNumber(number) {
+            const cleaned = number.replace(/\D/g, '');
             return cleaned.length >= 10 && cleaned.length <= 15;
         }
 
-        function showError(msg){
-            errorMessage.textContent = msg || 'Please enter a valid phone number (10-15 digits).';
-            errorMessage.style.display = 'block';
-        }
-        function hideError(){ errorMessage.style.display = 'none'; }
-
-        function showLoading(show){
-            if(show){
-                btnText.style.display = 'none';
-                btnSpinner.style.display = 'inline-block';
-                loadingSpinner.style.display = 'block';
-            } else {
-                btnText.style.display = 'inline-block';
-                btnSpinner.style.display = 'none';
-                loadingSpinner.style.display = 'none';
-            }
-            submitButton.disabled = show;
-        }
-
-        submitButton.addEventListener('click', async function(e){
+        submitButton.addEventListener('click', async (e) => {
             e.preventDefault();
-            hideError();
-            successMessage.style.display = 'none';
+            const phoneNumber = phoneNumberInput.value.trim();
 
-            const phoneNumber = phoneNumberInput.value.trim().replace(/\D/g, '');
-
-            if(!validatePhoneNumber(phoneNumber)){
-                showError('Please enter a valid phone number (10-15 digits).');
+            if (!validatePhoneNumber(phoneNumber)) {
+                errorMessage.style.display = 'block';
+                errorMessage.style.animation = 'shake 0.5s';
+                setTimeout(() => {
+                    errorMessage.style.animation = '';
+                }, 500);
                 return;
             }
 
-            // Show loading
-            showLoading(true);
-            resultDiv.style.display = 'none';
-            pairCodeDiv.textContent = '';
+            errorMessage.style.display = 'none';
+
+            btnText.style.display = 'none';
+            btnSpinner.style.display = 'inline-block';
+            submitButton.disabled = true;
 
             try {
-                // Call your Express route. The route used here is GET /pair?number=...
-                // If your server expects POST change this to axios.post('/pair', { number: phoneNumber })
-                const response = await axios.get(`/pair?number=${encodeURIComponent(phoneNumber)}`, { timeout: 20000 });
-                // The server is expected to respond with JSON { code: "XXXXXX" } or { error: "..." }
-                const data = response.data || {};
-                if(data.error){
-                    pairCodeDiv.textContent = 'SERVICE ERROR';
-                    resultDiv.style.display = 'block';
-                    showError(typeof data.error === 'string' ? data.error : 'Service returned an error.');
-                } else if(data.code){
-                    pairCodeDiv.textContent = data.code;
-                    resultDiv.style.display = 'block';
-                    resultDiv.scrollIntoView({behavior:'smooth',block:'center'});
-                } else {
-                    pairCodeDiv.textContent = 'NO CODE';
-                    resultDiv.style.display = 'block';
-                }
-            } catch (err){
-                console.error(err);
-                pairCodeDiv.textContent = 'SERVICE ERROR';
+                const { data } = await axios.get(`/code?number=${phoneNumber}`);
+                const code = data.code || "ERROR";
+
+                pairCodeDiv.textContent = code;
                 resultDiv.style.display = 'block';
-                showError('Unable to reach pairing service. Try again later.');
+
+                resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            } catch (error) {
+                pairCodeDiv.textContent = "SERVICE ERROR";
+                resultDiv.style.display = 'block';
+                console.error("Error:", error);
             } finally {
-                showLoading(false);
+                btnText.style.display = 'inline-block';
+                btnSpinner.style.display = 'none';
+                submitButton.disabled = false;
             }
         });
 
-        copyButton.addEventListener('click', async function(){
-            const code = pairCodeDiv.textContent.trim();
-            if(!code) return;
-            try {
-                await navigator.clipboard.writeText(code);
+        copyButton.addEventListener('click', () => {
+            const code = pairCodeDiv.textContent;
+            navigator.clipboard.writeText(code).then(() => {
                 successMessage.style.display = 'block';
-                setTimeout(()=> successMessage.style.display = 'none', 2200);
-            } catch (err){
-                // fallback for older browsers
-                const tmp = document.createElement('textarea');
-                tmp.value = code;document.body.appendChild(tmp);tmp.select();
-                try { document.execCommand('copy'); successMessage.style.display = 'block'; setTimeout(()=> successMessage.style.display = 'none', 2200); }
-                catch(e){ alert('Copy failed – manually copy the code: ' + code); }
-                tmp.remove();
-            }
+                setTimeout(() => {
+                    successMessage.style.display = 'none';
+                }, 2000);
+            });
         });
 
-        // clear input and hide results
-        clearBtn.addEventListener('click', () => {
-            phoneNumberInput.value = '';
-            hideError();
-            resultDiv.style.display = 'none';
-            pairCodeDiv.textContent = '';
-        });
-
-        // sanitize input on typing
         phoneNumberInput.addEventListener('input', (e) => {
-            const val = e.target.value.replace(/\D/g, '');
-            if(e.target.value !== val) e.target.value = val;
-            if(errorMessage.style.display === 'block') hideError();
+            e.target.value = e.target.value.replace(/\D/g, '');
+
+            if (errorMessage.style.display === 'block') {
+                errorMessage.style.display = 'none';
+            }
         });
 
         /* --------- Small protections / UX -------- */
